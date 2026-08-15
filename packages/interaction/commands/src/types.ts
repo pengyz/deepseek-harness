@@ -54,6 +54,11 @@ export interface CommandDescriptor {
   readonly description: string
   /** Optional free-form input hint advertised to capable clients. */
   readonly input?: CommandInputDescriptor
+  /**
+   * Internal (non-discoverable) command: excluded from `list()` discovery;
+   * `execute()` and the remote still dispatch it. Not user-typed.
+   */
+  readonly internal?: boolean
 }
 
 /**

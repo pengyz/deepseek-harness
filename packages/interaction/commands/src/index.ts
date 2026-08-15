@@ -64,6 +64,13 @@ export interface CommandDefinition {
    * that payload in the session log.
    */
   readonly recordInput?: boolean
+  /**
+   * Internal (non-discoverable) command: excluded from `list()` discovery so
+   * interactive adapters never offer it in the slash menu, while `execute()`
+   * and the `commands/execute` remote still dispatch it. For programmatic
+   * host surfaces (panels, UI actions) that must not be user-typed.
+   */
+  readonly internal?: boolean
   /** Execute against the receiving agent without sending the command to the model. */
   readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>
 }
@@ -203,12 +210,14 @@ function normalizeDefinition(definition: CommandDefinition): RegisteredCommand {
     description: definition.description,
     ...input === undefined ? {} : { input },
     ...definition.recordInput === undefined ? {} : { recordInput: definition.recordInput },
+    ...definition.internal === true ? { internal: true as const } : {},
     handler: definition.handler,
   })
   const descriptor = Object.freeze({
     name: normalized.name,
     description: normalized.description,
     ...normalized.input === undefined ? {} : { input: normalized.input },
+    ...normalized.internal === true ? { internal: true as const } : {},
   })
   return { definition: normalized, descriptor }
 }
@@ -285,6 +294,9 @@ export class CommandRuntime extends TypertRemoteService {
   list(agent: Agent): readonly CommandDescriptor[] {
     return Object.freeze([...this.view(agent).values()]
       .map(command => command.descriptor)
+      // Internal commands are not user-discoverable (panels/UI dispatch them
+      // programmatically through execute / the commands/execute remote).
+      .filter(command => command.internal !== true)
       // Names are unique in the effective view, so equality is impossible.
       .sort((left, right) => left.name < right.name ? -1 : 1))
   }
