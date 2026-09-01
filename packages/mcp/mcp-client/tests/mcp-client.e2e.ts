@@ -350,8 +350,8 @@ describe('server-everything — official test server', () => {
     const schemas = ctx.tools.schemas()
     const names = schemas.map(s => s.name)
     expect(names).toContain('mcp__everything__echo')
-    expect(names).toContain('mcp__everything__get-sum')
-    expect(names).toContain('mcp__everything__get-tiny-image')
+    expect(names).toContain(publicToolName('everything', 'get-sum'))
+    expect(names).toContain(publicToolName('everything', 'get-tiny-image'))
     expect(names.length).toBeGreaterThanOrEqual(8)
   })
 
@@ -367,7 +367,7 @@ describe('server-everything — official test server', () => {
   it('executes get-sum({ a: 3, b: 7 }) → contains "10"', async () => {
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: nextCallId(), name: 'mcp__everything__get-sum', arguments: { a: 3, b: 7 },
+      callId: nextCallId(), name: publicToolName('everything', 'get-sum'), arguments: { a: 3, b: 7 },
     })
     expect(result.isError).toBe(false)
     expect(textOf(result.content[0])).toContain('10')
@@ -376,7 +376,7 @@ describe('server-everything — official test server', () => {
   it('executes get-tiny-image → explicit refusal without a durable route', async () => {
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: nextCallId(), name: 'mcp__everything__get-tiny-image', arguments: {},
+      callId: nextCallId(), name: publicToolName('everything', 'get-tiny-image'), arguments: {},
     })
     expect(result.isError).toBe(false)
     expect(result.content.map(block => block.type === 'text' ? block.text : '').join('\n'))

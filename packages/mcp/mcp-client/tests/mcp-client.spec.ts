@@ -154,13 +154,21 @@ const defaultOpts: ToolBridgeOptions = {
 describe('publicToolName', () => {
   it('joins clean names verbatim', () => {
     expect(publicToolName('github', 'create_issue')).toBe('mcp__github__create_issue')
-    expect(publicToolName('everything', 'get-sum')).toBe('mcp__everything__get-sum')
   })
 
   it('replaces invalid characters and appends an identity hash', () => {
     const name = publicToolName('srv', 'admin.reset')
     expect(name).toMatch(/^mcp__srv__admin_reset_[0-9a-f]{12}$/)
     expect(name.length).toBeLessThanOrEqual(64)
+  })
+
+  it('replaces hyphens so the public name satisfies Claude tool-name validation', () => {
+    // Claude's Messages API rejects tool names outside `^[A-Za-z][A-Za-z0-9_]{0,63}$`
+    // — no hyphens allowed — even though a hyphen is a valid MCP server name
+    // or raw tool name character.
+    const name = publicToolName('feishu-mcp-pro', 'app_scopes')
+    expect(name).toMatch(/^[A-Za-z][A-Za-z0-9_]{0,63}$/)
+    expect(name).toMatch(/^mcp__feishu_mcp_pro__app_scopes_[0-9a-f]{12}$/)
   })
 
   it('truncates over-long names and appends an identity hash', () => {
@@ -341,7 +349,7 @@ describe('syncTools', () => {
           }
           : {
             tools: [{
-              name: 'future-schema',
+              name: 'future_schema',
               inputSchema: { type: 'object' },
               outputSchema: { type: 'object', patternProperties: { '^x-': { type: 'string' } } },
             }],
@@ -372,7 +380,7 @@ describe('syncTools', () => {
 
       const fallback = await ctx.tools.execute({
         signal: testToolSignal,
-        callId: CallId('fallback'), name: 'mcp__srv__future-schema', arguments: {},
+        callId: CallId('fallback'), name: 'mcp__srv__future_schema', arguments: {},
       })
       if (fallback.isError) throw new Error('unsupported schema must use the bridge fallback')
       expect(fallback.value).toEqual({
@@ -769,14 +777,14 @@ describe('tool execution', () => {
   it('preserves primitive JSON MCP blocks while Native rendering marks them unsupported', async () => {
     const blocks = [42, null, ['nested']] satisfies JsonValue[]
     const client = createMockClient(
-      [{ name: 'primitive-blocks', inputSchema: { type: 'object' } }],
+      [{ name: 'primitive_blocks', inputSchema: { type: 'object' } }],
       { content: blocks },
     )
 
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: CallId('primitive'), name: 'mcp__srv__primitive-blocks', arguments: {},
+      callId: CallId('primitive'), name: 'mcp__srv__primitive_blocks', arguments: {},
     })
 
     expect(result.content[0]).toEqual({
@@ -818,14 +826,14 @@ describe('tool execution', () => {
   it('falls back to JsonValue for unsupported advertised output schemas', async () => {
     const client = createMockClient(
       [{
-        name: 'future-schema',
+        name: 'future_schema',
         inputSchema: { type: 'object' },
         outputSchema: { type: 'object', patternProperties: { '^x-': { type: 'string' } } },
       }],
       { content: [], structuredContent: ['kept', { nested: true }] },
     )
     await syncTools(client as never, ctx, defaultOpts, new Map())
-    const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('fallback'), name: 'mcp__srv__future-schema', arguments: {} })
+    const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('fallback'), name: 'mcp__srv__future_schema', arguments: {} })
     if (result.isError) throw new Error('unsupported MCP output schemas must fall back')
     expect(result.value).toEqual({ content: [], structuredContent: ['kept', { nested: true }] })
   })
@@ -846,13 +854,13 @@ describe('tool execution', () => {
 
   it('rejects tools that require task-based execution', async () => {
     const client = createMockClient([
-      { name: 'task-only', inputSchema: { type: 'object' }, execution: { taskSupport: 'required' } },
+      { name: 'task_only', inputSchema: { type: 'object' }, execution: { taskSupport: 'required' } },
     ])
 
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: CallId('task-only'), name: 'mcp__srv__task-only', arguments: {},
+      callId: CallId('task-only'), name: 'mcp__srv__task_only', arguments: {},
     })
 
     expect(result.isError).toBe(true)
@@ -891,7 +899,7 @@ describe('tool execution', () => {
   })
 
   it('preserves structuredContent on a successful legacy result', async () => {
-    const client = createMockClient([{ name: 'legacy-structured', inputSchema: { type: 'object' } }])
+    const client = createMockClient([{ name: 'legacy_structured', inputSchema: { type: 'object' } }])
     client.callTool.mockResolvedValue({
       toolResult: 'legacy',
       structuredContent: { answer: 42 },
@@ -900,7 +908,7 @@ describe('tool execution', () => {
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: CallId('legacy-structured'), name: 'mcp__srv__legacy-structured', arguments: {},
+      callId: CallId('legacy-structured'), name: 'mcp__srv__legacy_structured', arguments: {},
     })
 
     if (result.isError) throw new Error('expected legacy structured result success')
@@ -911,13 +919,13 @@ describe('tool execution', () => {
   })
 
   it('maps a legacy isError reply to failure', async () => {
-    const client = createMockClient([{ name: 'legacy-error', inputSchema: { type: 'object' } }])
+    const client = createMockClient([{ name: 'legacy_error', inputSchema: { type: 'object' } }])
     client.callTool.mockResolvedValue({ toolResult: { reason: 'nope' }, isError: true })
 
     await syncTools(client as never, ctx, defaultOpts, new Map())
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: CallId('legacy-error'), name: 'mcp__srv__legacy-error', arguments: {},
+      callId: CallId('legacy-error'), name: 'mcp__srv__legacy_error', arguments: {},
     })
 
     expect(result.isError).toBe(true)
@@ -1069,12 +1077,12 @@ describe('tool execution edge cases', () => {
 
   it('handles a legacy result with neither content nor toolResult', async () => {
     const client = createMockClient(
-      [{ name: 'legacy-empty', inputSchema: { type: 'object' } }],
+      [{ name: 'legacy_empty', inputSchema: { type: 'object' } }],
     )
     client.callTool.mockResolvedValue({})
 
     await syncTools(client as never, ctx, defaultOpts, new Map())
-    const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('legacy-empty'), name: 'mcp__srv__legacy-empty', arguments: {} })
+    const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('legacy-empty'), name: 'mcp__srv__legacy_empty', arguments: {} })
 
     expect(result.content[0]).toEqual({ type: 'text', text: '(no output)' })
   })

@@ -48,8 +48,15 @@ export type McpResult<Structured extends JsonValue = JsonValue> = {
  */
 const MAX_PUBLIC_NAME_LENGTH = 64
 
-/** DeepSeek function-name contract: only `[A-Za-z0-9_-]` is allowed. */
-const INVALID_NAME_CHARS = /[^A-Za-z0-9_-]/g
+/**
+ * Function-name contract: only `[A-Za-z0-9_]` is allowed. This is the
+ * intersection of every wire protocol this harness fronts — DeepSeek's own
+ * contract allows a trailing hyphen, but Claude's Messages API tool-name
+ * validation (`^[A-Za-z][A-Za-z0-9_]{0,63}$`) does not, so the public name
+ * must satisfy the strictest consumer regardless of which backend a given
+ * request ends up routed to.
+ */
+const INVALID_NAME_CHARS = /[^A-Za-z0-9_]/g
 
 /** Hex chars of the SHA-256 identity hash appended on lossy normalization. */
 const HASH_LENGTH = 12
@@ -99,10 +106,9 @@ function callToolUncached(
  *
  * Deterministic pure function of `(serverName, rawName)`: the clean case is
  * `mcp__<serverName>__<rawName>` verbatim. When character replacement or
- * truncation to the DeepSeek function-name contract (64 chars,
- * `[A-Za-z0-9_-]`) changes the name, a 12-hex-char SHA-256 hash of the
- * identity is appended so distinct MCP identities never collapse into the
- * same public name.
+ * truncation to the function-name contract (64 chars, `[A-Za-z0-9_]`)
+ * changes the name, a 12-hex-char SHA-256 hash of the identity is appended
+ * so distinct MCP identities never collapse into the same public name.
  *
  * @param serverName - Stable local namespace from plugin config.
  * @param rawName - The MCP server's own tool name.
